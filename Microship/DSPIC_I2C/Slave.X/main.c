@@ -93,7 +93,7 @@ void onI2CReadDone(i2cPackage_t package) {
     if (checkI2CStatus(package)) {
         if (DEBUG_I2C) {
             printf("I2C data:\n");
-            int l = 0;
+            uint16_t l = 0;
             for (l = 0; l < package.length; l++) {
                 uint16_t v;
                 concatinate(package.data[l].data1, package.data[l].data2, &v);
@@ -108,9 +108,7 @@ bool checkI2CStatus(i2cPackage_t package) {
         i2cError = package.status;
         if (DEBUG_I2C) {
             switch(i2cError) {
-                default: 
-                    printf("I2C_OK\n"); break;
-                    break;
+                default: break;
                 case I2C_NOK: printf("I2C_NOK\n"); break;
                 case I2C_OVERFLOW: printf("I2C_OVERFLOW\n"); break;
                 case I2C_COLLISION: printf("I2C_COLLISION\n"); break;
@@ -119,7 +117,6 @@ bool checkI2CStatus(i2cPackage_t package) {
                 case I2C_UNEXPECTED_DATA: printf("I2C_UNEXPECTED_DATA\n"); break;
                 case I2C_UNEXPECTED_ADR: printf("I2C_UNEXPECTED_ADR\n"); break;
                 case I2C_STILL_BUSY: printf("I2C_STILL_BUSY\n"); break;
-                //case I2C_TIMEOUT: printf("I2C_TIMEOUT\n"); break;
             }
         }
     //}
@@ -146,6 +143,7 @@ int main(void) {
     
     DelayMs(100);
     if (DEBUG) printf("Slave start\n");
+    i2cDriverEnable(true);
     
     while (1) {
         

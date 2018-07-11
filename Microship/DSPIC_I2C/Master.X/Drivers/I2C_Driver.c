@@ -3,7 +3,6 @@
 #include <stdint.h>        /* Includes uint16_t definition                    */
 #include <stdbool.h>
 
-#include "../../Common/COM_Settings.h"  /* Common communication variables     */
 #include "../Settings.h"
 #include "../utils.h"
 #include "I2C_Driver.h"
@@ -799,6 +798,7 @@ void i2cDriverMasterRead(i2cPackage_t *data) {
 
 void __attribute__((interrupt, no_auto_psv)) _MI2C1Interrupt(void) {
     if (_MI2C1IF) {
+        LED1 = !LED1;
         masterInterrupt = true;
         _MI2C1IF = 0;
     }
@@ -808,6 +808,7 @@ void __attribute__((interrupt, no_auto_psv)) _MI2C1Interrupt(void) {
 
 void __attribute__((interrupt, no_auto_psv)) _SI2C1Interrupt(void) {
     if (_SI2C1IF) {
+        LED1 = !LED1;
         slaveInterrupt = true;
         _SI2C1IF = 0;
 

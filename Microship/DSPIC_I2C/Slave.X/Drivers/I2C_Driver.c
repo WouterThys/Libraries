@@ -798,6 +798,7 @@ void i2cDriverMasterRead(i2cPackage_t *data) {
 
 void __attribute__((interrupt, no_auto_psv)) _MI2C1Interrupt(void) {
     if (_MI2C1IF) {
+        LED1 = !LED1;
         masterInterrupt = true;
         _MI2C1IF = 0;
     }
@@ -807,6 +808,7 @@ void __attribute__((interrupt, no_auto_psv)) _MI2C1Interrupt(void) {
 
 void __attribute__((interrupt, no_auto_psv)) _SI2C1Interrupt(void) {
     if (_SI2C1IF) {
+        LED1 = !LED1;
         slaveInterrupt = true;
         _SI2C1IF = 0;
 

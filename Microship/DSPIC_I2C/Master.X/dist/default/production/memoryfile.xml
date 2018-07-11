@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <project>
-  <executable name="dist/default/production/Slave.X.production.elf">
+  <executable name="dist/default/production/Master.X.production.elf">
     <memory name="data">
       <units>bytes</units>
       <length>4096</length>
-      <used>446</used>
-      <free>3650</free>
+      <used>462</used>
+      <free>3634</free>
     </memory>
     <memory name="program">
       <units>bytes</units>
       <length>32994</length>
-      <used>12126</used>
-      <free>20868</free>
+      <used>12168</used>
+      <free>20826</free>
     </memory>
   </executable>
 </project>
