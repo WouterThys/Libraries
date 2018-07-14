@@ -12,7 +12,7 @@
 
 #include <xc.h> // include processor files - each processor file is guarded.  
 
-#define DEBUG       0           /* General debug enable                       */
+#define DEBUG       1           /* General debug enable                       */
 #define DEBUG_I2C  (1 & DEBUG)  /* I²C debug enable                           */
 #define DEBUG_FSM  (1 & DEBUG)  /* FSM debug enable                           */
 
@@ -21,7 +21,7 @@
  */
 
 #define IP_U1RX      6
-#define IP_I2C       5
+#define IP_I2C       7
 #define IP_MENU_TMR  2
 #define IP_MAIN_TMR  1
     
@@ -39,6 +39,8 @@
 /**
  * UART
  */      
+// Orange = RX
+// Geel = TX
 #define UART1_BAUD      57600 /* 57600 */
 #define UART1_ID        2   
 
@@ -51,13 +53,14 @@
 /**
  * I²C
  */
-#define I2C_ADDRESS     0x03
+#define I2C_SLAVE      1 /*I2C_MASTER*/
+#define I2C_ADDRESS     0x55
 
-#define I2C_SCL_Dir     TRISBbits.TRISB6        /* SCL Direction              */
-#define I2C_SDA_Dir     TRISBbits.TRISB5        /* SDA Direction              */
+#define I2C_SCL_Dir     TRISBbits.TRISB8        /* SCL Direction              */
+#define I2C_SDA_Dir     TRISBbits.TRISB9        /* SDA Direction              */
 
-#define I2C_SCL_Odc     ODCBbits.ODCB6          /* Open drain config for SCL  */
-#define I2C_SDA_Odc     ODCBbits.ODCB5          /* Open drain config for SDA  */
+#define I2C_SCL_Odc     ODCBbits.ODCB8          /* Open drain config for SCL  */
+#define I2C_SDA_Odc     ODCBbits.ODCB9          /* Open drain config for SDA  */
 
 #endif	/* XC_HEADER_TEMPLATE_H */
 

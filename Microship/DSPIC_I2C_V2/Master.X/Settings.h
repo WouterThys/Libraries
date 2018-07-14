@@ -12,7 +12,7 @@
 
 #include <xc.h> // include processor files - each processor file is guarded.  
 
-#define DEBUG       0           /* General debug enable                       */
+#define DEBUG       1           /* General debug enable                       */
 #define DEBUG_I2C  (1 & DEBUG)  /* I²C debug enable                           */
 #define DEBUG_FSM  (1 & DEBUG)  /* FSM debug enable                           */
 
@@ -39,6 +39,8 @@
 /**
  * UART
  */      
+// Orange = RX
+// Geel = TX
 #define UART1_BAUD      57600 /* 57600 */
 #define UART1_ID        2   
 
@@ -51,8 +53,8 @@
 /**
  * I²C
  */
-#define I2C_SLAVE      1 /*I2C_MASTER*/
-#define I2C_ADDRESS     0x03
+#define I2C_MASTER      1 /*I2C_MASTER*/
+#define I2C_ADDRESS     0x55
 
 #define I2C_SCL_Dir     TRISBbits.TRISB6        /* SCL Direction              */
 #define I2C_SDA_Dir     TRISBbits.TRISB5        /* SDA Direction              */

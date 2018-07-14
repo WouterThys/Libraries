@@ -10,13 +10,21 @@
 #include "Settings.h"
 #include "Drivers/SYSTEM_Driver.h"
 #include "Drivers/UART_Driver.h"
-#include "Drivers/I2C_Driver.h"
+#include "Drivers/I2C_MDriver.h"
 
 
 /*******************************************************************************
  *          TODO
  ******************************************************************************/
-
+/*
+ * MASTER:
+ *  - BYTE/WORD wide communication: in case of WORD wide -> always R/W two bytes
+ * 
+ * SLAVE:
+ *  - BYTE/WORD wide communication: in case of WORD wide -> always R/W two bytes
+ *  - Data buffer and pointer should be given in the i2cDriverInit(..) method
+ *  - Event (function pointer) when I²C transaction is done (also in i2cDriverInit(..))
+ */
 
 /*******************************************************************************
  *          DEFINES
@@ -29,16 +37,17 @@
 /*******************************************************************************
  *          VARIABLES
  ******************************************************************************/
+static i2cPackage_t masterPackage;
 static int8_t i2cError;
+
+static uint8_t writeData[3] = {0x01, 0x02, 0x03};
+static uint8_t readData[3] = {0x00, 0x00, 0x00};
 
 /*******************************************************************************
  *          LOCAL FUNCTIONS
  ******************************************************************************/
 static void initialize();
 static void onUartReadDone(UartData_t data);
-
-static void onI2CAnswer(i2cPackage_t * package);
-static void onI2CReadDone(i2cPackage_t package);
 static bool checkI2CStatus(i2cPackage_t package);
 
 void initialize() {
@@ -56,51 +65,6 @@ void initialize() {
 
 void onUartReadDone(UartData_t data) {
     
-}
-
-/**
- * The I2C master asks for data, this method should fill the data buffer with
- * the data the master requests.
- * @param data
- */
-void onI2CAnswer(i2cPackage_t * package) {
-    uint16_t v1 = 0x1234;
-    uint16_t v2 = 0x4321;
-    uint16_t v3 = 0x55AA;
-    switch(package->length) {
-        case 1:
-            split(v1, &package->data[0].data1, &package->data[0].data2);
-            break;
-        case 2:
-            split(v1, &package->data[0].data1, &package->data[0].data2);
-            split(v2, &package->data[1].data1, &package->data[1].data2);
-            break;
-        case 3:
-            split(v1, &package->data[0].data1, &package->data[0].data2);
-            split(v2, &package->data[1].data1, &package->data[1].data2);
-            split(v3, &package->data[2].data1, &package->data[2].data2);
-            break;
-        default:
-            break;
-    }
-}
-
-/**
- * A full read operation has occurred
- * @param data
- */
-void onI2CReadDone(i2cPackage_t package) {
-    if (checkI2CStatus(package)) {
-        if (DEBUG_I2C) {
-            printf("I2C data:\n");
-            uint16_t l = 0;
-            for (l = 0; l < package.length; l++) {
-                uint16_t v;
-                concatinate(package.data[l].data1, package.data[l].data2, &v);
-                printf(" d%d=%d\n", l, v); 
-            }
-        }
-    }
 }
 
 bool checkI2CStatus(i2cPackage_t package) {
@@ -139,14 +103,24 @@ int main(void) {
     DelayMs(100);
     
     uartDriverInit(UART1_BAUD, &onUartReadDone);
-    i2cDriverInitSlave(I2C_ADDRESS, &onI2CAnswer, &onI2CReadDone);    
-    
-    DelayMs(100);
-    if (DEBUG) printf("Slave start\n");
+    uartDriverEnable(true);
+    i2cDriverInit();  
+   
+    printf("Slave start\n");
     i2cDriverEnable(true);
+   
+//    masterPackage.address = I2C_ADDRESS;
+//    masterPackage.command = 0;
+//    masterPackage.data = &writeData[0];
+//    masterPackage.length = 1;
+//   
+//    i2cDriverWrite(&masterPackage);
+//    checkI2CStatus(masterPackage);
     
     while (1) {
+        LED1 = !LED1;
         
+        DelayMs(100);
        
     }
     return 0;

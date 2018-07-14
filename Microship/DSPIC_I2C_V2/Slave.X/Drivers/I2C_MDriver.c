@@ -45,7 +45,7 @@
 #define CHECK_TBF     0x0001 /* Mask for Transmit Buffer Full                 */
 
 typedef struct {
-    int16_t cmd;     // Read or write command
+    uint16_t cmd;     // Read or write command
     int16_t state;    // FSM state
     int16_t dataCnt;  // Data count
     int16_t retryCnt; // Retry count
@@ -60,18 +60,19 @@ typedef struct {
 /*******************************************************************************
  *          MACRO FUNCTIONS
  ******************************************************************************/
-#define i2cAddressWrite(addr)   I2C2TRN = (((addr << 1) & I2C_ADDRESS_MASK) + 0)
-#define i2cAddressRead(addr)    I2C2TRN = (((addr << 1) & I2C_ADDRESS_MASK) + 1)
-#define i2cDataWrite(data)      I2C2TRN = data
-#define i2cDataRead()           I2C2RCV
-#define i2cStart()              I2C2CONbits.SEN = 1
-#define i2cRepeatStart()        I2C2CONbits.RSEN = 1
-#define i2cReceiveEn()          I2C2CONbits.RCEN = 1
-#define i2cAckEn()              I2C2CONbits.ACKEN = 1
-#define i2cAck()                I2C2CONbits.ACKDT = 0
-#define i2cNAck()               I2C2CONbits.ACKDT = 1
-#define i2cStop()               I2C2CONbits.PEN = 1
-#define i2cCheck(msk)           ((I2C2STAT & msk) > 0)
+#define i2cAddressWrite(addr)   I2C1TRN = (((addr << 1) & I2C_ADDRESS_MASK) + 0)
+#define i2cAddressRead(addr)    I2C1TRN = (((addr << 1) & I2C_ADDRESS_MASK) + 1)
+#define i2cDataWrite(data)      I2C1TRN = data
+#define i2cDataRead()           I2C1RCV
+#define i2cStart()              I2C1CONbits.SEN = 1
+#define i2cRepeatStart()        I2C1CONbits.RSEN = 1
+#define i2cReceiveEn()          I2C1CONbits.RCEN = 1
+#define i2cAckEn()              I2C1CONbits.ACKEN = 1
+#define i2cAck()                I2C1CONbits.ACKDT = 0
+#define i2cNAck()               I2C1CONbits.ACKDT = 1
+#define i2cStop()               I2C1CONbits.PEN = 1
+#define i2cSclRel()             I2C1CONbits.SCLREL = 1
+#define i2cCheck(msk)           ((I2C1STAT & msk) > 0)
 
 /*******************************************************************************
  *          VARIABLES
@@ -168,7 +169,7 @@ void doFsm(i2cFsm_t * fsm) {
                 
                 if (!i2cCheck(CHECK_ACKSTAT)) { // ACK
                     if (fsm->dataCnt >= fsm->data->length) { 
-                        fsm->state = I2C_STATE_STOP; // Done
+                        fsm->state = I2C_STATE_ACK_POLL; // Done
                     } else {
                         fsm->state = I2C_STATE_SEND; // Keep writing
                     }
@@ -304,20 +305,20 @@ void doFsm(i2cFsm_t * fsm) {
             bool ackTest;
         case I2C_STATE_ACK_POLL:
             i2cStop();
-            while(!_MI2C2IF);
-            while(_MI2C2IF);
+            while(!_MI2C1IF);
+            while(_MI2C1IF);
             ackTest = true;
             while (ackTest) {
                 i2cRepeatStart();
-                while(!_MI2C2IF);
-                while(_MI2C2IF);
+                while(!_MI2C1IF);
+                while(_MI2C1IF);
                 i2cAddressWrite(fsm->data->address);
                 while (_TRSTAT);
                 ackTest = !i2cCheck(CHECK_ACKSTAT);
             }
             i2cStop();
-            while(!_MI2C2IF);
-            while(_MI2C2IF);
+            while(!_MI2C1IF);
+            while(_MI2C1IF);
             masterInterrupt = false;
             fsm->state = I2C_STATE_STOP;
             break;
@@ -329,11 +330,16 @@ void doFsm(i2cFsm_t * fsm) {
 uint8_t tmp; // For dummy read
 void doFsm(i2cFsm_t * fsm) {
     
-    if (!i2cCheck(CHECK_RW) && !i2cCheck(CHECK_DA)) { // Address matched
+    // Inputs
+    bool mstrWrite = !i2cCheck(CHECK_RW);
+    bool mstrAddr = !i2cCheck(CHECK_DA);
+    bool mstrAck = !i2cCheck(CHECK_ACKSTAT);
+    
+    if (mstrWrite && mstrAddr) { // Address matched
         tmp = i2cDataRead();        // Dummy read
         i2cFlag.commFlag = true;    // Next byte will be command
         
-    } else if (!i2cCheck(CHECK_RW) && i2cCheck(CHECK_DA)) { // Data
+    } else if (mstrWrite && !mstrAddr) { // Data
         
         if (i2cFlag.commFlag) {
             i2cFlag.commFlag = false;
@@ -349,11 +355,11 @@ void doFsm(i2cFsm_t * fsm) {
             dataPtr = &dataBfr[0]; // Reset pointer
             
         }
-    } else if (i2cCheck(CHECK_RW) && !i2cCheck(CHECK_DA)) {
+    } else if (!mstrWrite && mstrAddr) {
         tmp = i2cDataRead();
         i2cDataWrite(*dataPtr); // Write the value of the buffer
-        I2C2CONbits.SCLREL = 1; // Release SCL line
-        while (I2C2STATbits.TBF); // Wait
+        i2cSclRel(); // Release SCL line
+        while (i2cCheck(CHECK_TBF)); // Wait
         
         dataPtr = &dataBfr[0]; // Reset pointer
     }
@@ -378,19 +384,17 @@ void i2cDriverInit() {
     /* Ports */
     I2C_SCL_Odc = 0;    // Open drain
     I2C_SDA_Odc = 0;    // Open drain
-    I2C_SCL_Dir = 0;
-    I2C_SDA_Dir = 0;
     
-    /* I2C2 Registers */
-    I2C2CON = 0x0000;
-    I2C2CONbits.SCLREL = 1; // Releases the SCLx clock
-    I2C2STAT = 0x0000;
-    I2C2BRG = 320;//180; // 100kHz clock
+    /* I2C1 Registers */
+    I2C1CON = 0x0000;
+    I2C1CONbits.SCLREL = 1; // Releases the SCLx clock
+    I2C1STAT = 0x0000;
+    I2C1BRG = 180;//180; // 100kHz clock
     
     /* Interrupts master */
-    _MI2C2IF = 0; // Clear flag
-    _MI2C2IP = IP_I2C; // Priority is highest
-    _MI2C2IE = 1; // Enable
+    _MI2C1IF = 0; // Clear flag
+    _MI2C1IP = IP_I2C; // Priority is highest
+    _MI2C1IE = 1; // Enable
 }
 #endif
 
@@ -412,41 +416,44 @@ void i2cDriverInit() {
     /* Ports */
     I2C_SCL_Odc = 0;    // Open drain
     I2C_SDA_Odc = 0;    // Open drain
+    //I2C_SCL_Dir = 1;
+    //I2C_SDA_Dir = 1;
     
-    /* I2C2 Registers */
-    I2C2CON = 0x0000;
-    I2C2ADD = I2C_ADDRESS;
-    IFS1 = 0;
+    /* I2C1 Registers */
+    I2C1CON = 0x0000;
+    I2C1STAT = 0x0000;
+    I2C1MSK = 0x0000;
+    I2C1ADD = I2C_ADDRESS;
 
     /* Interrupts slave */
-    _SI2C2IF = 0; // Clear flag
-    _SI2C2IP = IP_I2C; // Priority is highest
-    _SI2C2IE = 1; // Enable
+    _SI2C1IF = 0; // Clear flag
+    _SI2C1IP = IP_I2C; // Priority is highest
+    _SI2C1IE = 1; // Enable
 }
 #endif
 
 void i2cDriverEnable(bool enable) {
     if (enable) {
-        I2C2CONbits.I2CEN = 1; // Enable I2C
+        I2C1CONbits.I2CEN = 1; // Enable I2C
     } else {
-        I2C2CONbits.I2CEN = 0; // Disable I2C
+        I2C1CONbits.I2CEN = 0; // Disable I2C
     }
 }
 
 void i2cDriverReset() {
 
-    /* I2C2 Registers */
-    I2C2CON = 0x0000; // Disables module
-    I2C2STAT = 0x0000;
+    /* I2C1 Registers */
+    I2C1CON = 0x0000; // Disables module
+    I2C1STAT = 0x0000;
 
     /* Interrupts */
-    _MI2C2IE = 0; // Disable
-    _MI2C2IF = 0; // Clear flag
-    _MI2C2IE = 1; // Enable
+    _MI2C1IE = 0; // Disable
+    _MI2C1IF = 0; // Clear flag
+    _MI2C1IE = 1; // Enable
 
-    _SI2C2IE = 0; // Disable
-    _SI2C2IF = 0; // Clear flag
-    _SI2C2IE = 1; // Enable
+    _SI2C1IE = 0; // Disable
+    _SI2C1IF = 0; // Clear flag
+    _SI2C1IE = 1; // Enable
 
     /* Enable again */
     i2cDriverEnable(true);
@@ -458,8 +465,8 @@ void i2cDriverWrite(i2cPackage_t *data) {
 //        data->status = I2C_STILL_BUSY; // Still busy
 //        return;
 //    }
-//    uint8_t command = ((data->length << 4) & 0xF0) | (data->command & 0x0F);
-//    data->command = command;
+    uint8_t command = ((data->length << 4) & 0xF0) | (data->command & 0x0F);
+    data->command = command;
     
     i2cFsm.data = data;
     i2cFsm.cmd = I2C_MWRITE;
@@ -475,8 +482,8 @@ void i2cDriverRead(i2cPackage_t *data) {
 //        data->status = I2C_STILL_BUSY; // Still busy
 //        return;
 //    }
-//    uint8_t command = ((data->length << 4) & 0xF0) | (data->command & 0x0F);
-//    data->command = command;
+    uint8_t command = ((data->length << 4) & 0xF0) | (data->command & 0x0F);
+    data->command = command;
     
     i2cFsm.data = data;
     i2cFsm.cmd = I2C_MREAD;
@@ -491,9 +498,9 @@ void i2cDriverRead(i2cPackage_t *data) {
  ******************************************************************************/
 // I2C Master events
 
-void __attribute__((interrupt, no_auto_psv)) _MI2C2Interrupt(void) {
-    if (_MI2C2IF) {
-        _MI2C2IF = 0;
+void __attribute__((interrupt, no_auto_psv)) _MI2C1Interrupt(void) {
+    if (_MI2C1IF) {
+        _MI2C1IF = 0;
 #ifdef I2C_MASTER
         LED1 = !LED1;
         masterInterrupt = true;
@@ -503,9 +510,9 @@ void __attribute__((interrupt, no_auto_psv)) _MI2C2Interrupt(void) {
 
 // I2C Slave events
 
-void __attribute__((interrupt, no_auto_psv)) _SI2C2Interrupt(void) {
-    if (_SI2C2IF) {
-        _SI2C2IF = 0;
+void __attribute__((interrupt, no_auto_psv)) _SI2C1Interrupt(void) {
+    if (_SI2C1IF) {
+        _SI2C1IF = 0;
 #ifdef I2C_SLAVE
       LED1 = !LED1;
       doFsm(&i2cFsm);

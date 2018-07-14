@@ -40,17 +40,14 @@
 static i2cPackage_t masterPackage;
 static int8_t i2cError;
 
-static uint16_t writeData[3] = {0x5A5A, 0x1324, 0x0F0F};
-static uint16_t readData[3] = {0x0000, 0x0000, 0x0000};
+static uint8_t writeData[3] = {0x12, 0x13, 0x14};
+static uint8_t readData[3] = {0x00, 0x00, 0x00};
 
 /*******************************************************************************
  *          LOCAL FUNCTIONS
  ******************************************************************************/
 static void initialize();
 static void onUartReadDone(UartData_t data);
-
-static void i2cSendData(uint16_t * data, uint16_t length);
-static void i2cReadData(uint16_t * data, uint16_t length);
 static bool checkI2CStatus(i2cPackage_t package);
 
 void initialize() {
@@ -68,42 +65,6 @@ void initialize() {
 
 void onUartReadDone(UartData_t data) {
     
-}
-
-void i2cSendData(uint16_t * data, uint16_t length) {
-//    masterPackage.command = length;
-//    masterPackage.length = length;
-//    
-//    uint16_t l;
-//    for (l = 0; l < length; l++) {
-//        split(*(data+l), &masterPackage.data[l].data1, &masterPackage.data[l].data2);
-//    }
-//    
-//    i2cDriverMasterWrite(&masterPackage);
-//    
-//    if (checkI2CStatus(masterPackage)) {
-//        if (DEBUG_I2C) {
-//            printf("I2C package with length %d send!\n", length);
-//        }
-//    }
-}
-
-void i2cReadData(uint16_t * data, uint16_t length) {
-//    masterPackage.command = length;
-//    masterPackage.length = length;
-//    
-//    i2cDriverMasterRead(&masterPackage);
-//    
-//    if (checkI2CStatus(masterPackage)) {
-//        if (DEBUG_I2C) {
-//            printf("I2C data:\n");
-//            uint16_t l;
-//            for (l = 0; l < length; l++) {
-//                concatinate(masterPackage.data[l].data1, masterPackage.data[l].data2, (data + l));
-//                printf(" d%d=%d\n", l, *(data + l)); 
-//            }
-//        }
-//    }
 }
 
 bool checkI2CStatus(i2cPackage_t package) {
@@ -140,44 +101,48 @@ int main(void) {
 
     initialize();
     DelayMs(100);
+    LED1 = 1;
     
-//    uartDriverInit(UART1_BAUD, &onUartReadDone);
-//    i2cDriverInit();
-//    masterPackage.address = I2C_ADDRESS; // Slave address
-//    
-//    DelayMs(100);
-//    if (DEBUG) printf("Master start\n");
-//    i2cDriverEnable(true);
-//    
-//    DelayMs(2000); // Give slave time to start
-//    
-//    // Send 1
-//    i2cSendData(&writeData[0], 1);
-//    DelayMs(1);
-//    
-//    // Send 2
-//    i2cSendData(&writeData[0], 2);
-//    DelayMs(1);
-//    
-//    // Send 3
-//    i2cSendData(&writeData[0], 3);
-//    DelayMs(1);
-//    
-//    // Read 1
-//    i2cReadData(&readData[0], 1);
-//    DelayMs(1);
-//    
-//    // Read 2
-//    i2cReadData(&readData[0], 2);
-//    DelayMs(1);
-//    
-//    // Read 3
-//    i2cReadData(&readData[0], 3);
-//    DelayMs(1);
+    uartDriverInit(UART1_BAUD, &onUartReadDone);
+    uartDriverEnable(true);
+    i2cDriverInit();   
+    DelayMs(100);
     
+    printf("Master start\n");
+    i2cDriverEnable(true);
+    DelayMs(100);
+   
+    masterPackage.address = I2C_ADDRESS;
+   
+    LED1 = 0;
+    masterPackage.command = 0; // Address in slave device
+    masterPackage.data = &writeData[0];
+    masterPackage.length = 1;
+    i2cDriverWrite(&masterPackage);
+    checkI2CStatus(masterPackage);
+    DelayUs(10);
+    
+    
+    LED1 = 0;
+    masterPackage.command = 0;
+    masterPackage.data = &readData[0];
+    masterPackage.length = 1;
+    i2cDriverRead(&masterPackage);
+    checkI2CStatus(masterPackage);
+    DelayUs(10);
+    
+    DelayMs(100);
+    
+    uint16_t i;
+    printf("Read buffer after writing:\n");
+    for (i = 0; i < 3; i++) {
+        printf(" %d: %d\n", i, readData[i]);
+    }
     
     while (1) {
+        LED1 = !LED1;
         
+        DelayMs(1000);
        
     }
     return 0;

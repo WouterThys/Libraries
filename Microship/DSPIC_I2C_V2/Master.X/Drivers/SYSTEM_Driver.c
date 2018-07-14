@@ -40,9 +40,9 @@ void sysInitPll(void) {
     CLKDIVbits.ROI = 0; //bit 15 ROI: Recover on Interrupt bit
     CLKDIVbits.DOZE = 0;
     CLKDIVbits.FRCDIV = 0;
-    CLKDIVbits.PLLPOST = 1; 
+    CLKDIVbits.PLLPOST = 0; 
     CLKDIVbits.PLLPRE = 0; 
-    PLLFBDbits.PLLDIV = 38; 
+    PLLFBDbits.PLLDIV = 74; 
 }
 
 void sysInitPorts(void) {
