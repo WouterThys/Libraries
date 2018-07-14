@@ -82,7 +82,6 @@ static volatile bool masterInterrupt;
 #endif
 
 #ifdef I2C_SLAVE
-static i2cFlag_t i2cFlag;
 static uint8_t   dataBfr[MAX_BUFFER];        // Data
 static uint8_t * dataPtr;                    // Pointer to data location
 #endif
@@ -407,9 +406,6 @@ void i2cDriverInit() {
     i2cFsm.cmd = I2C_IDLE;
     i2cFsm.dataCnt = 0;
     i2cFsm.retryCnt = 0;
-    
-    i2cFlag.commFlag = false;
-    i2cFlag.dataFlag = false;
 
     dataPtr = &dataBfr[0];
     
@@ -519,35 +515,3 @@ void __attribute__((interrupt, no_auto_psv)) _SI2C1Interrupt(void) {
 #endif
     }
 }
-
-
-
-
-//    if (mstrWrite && mstrAddr) { // Address matched
-//        tmp = i2cDataRead();        // Dummy read
-//        i2cFlag.commFlag = true;    // Next byte will be command
-//        
-//    } else if (mstrWrite && !mstrAddr) { // Data
-//        
-//        if (i2cFlag.commFlag) {
-//            i2cFlag.commFlag = false;
-//            i2cFlag.dataFlag = true;
-//            
-//            dataPtr = dataPtr + i2cDataRead(); // Set pointer
-//            
-//        } else if (i2cFlag.dataFlag) {
-//            i2cFlag.commFlag = false;
-//            i2cFlag.dataFlag = false;
-//            
-//            *dataPtr = (uint8_t) i2cDataRead(); // Store value into buffer
-//            dataPtr = &dataBfr[0]; // Reset pointer
-//            
-//        }
-//    } else if (!mstrWrite && mstrAddr) {
-//        tmp = i2cDataRead();
-//        i2cDataWrite(*dataPtr); // Write the value of the buffer
-//        i2cSclRel(); // Release SCL line
-//        while (i2cCheck(CHECK_TBF)); // Wait
-//        
-//        dataPtr = &dataBfr[0]; // Reset pointer
-//    }
