@@ -40,7 +40,7 @@
 static i2cPackage_t masterPackage;
 static int8_t i2cError;
 
-static uint8_t writeData[3] = {0x12, 0x13, 0x14};
+static uint8_t writeData[3] = {0x0F, 0x0E, 0x0D};
 static uint8_t readData[3] = {0x00, 0x00, 0x00};
 
 /*******************************************************************************
@@ -117,7 +117,7 @@ int main(void) {
     LED1 = 0;
     masterPackage.command = 0; // Address in slave device
     masterPackage.data = &writeData[0];
-    masterPackage.length = 1;
+    masterPackage.length = 3;
     i2cDriverWrite(&masterPackage);
     checkI2CStatus(masterPackage);
     DelayUs(10);
@@ -126,7 +126,7 @@ int main(void) {
     LED1 = 0;
     masterPackage.command = 0;
     masterPackage.data = &readData[0];
-    masterPackage.length = 1;
+    masterPackage.length = 3;
     i2cDriverRead(&masterPackage);
     checkI2CStatus(masterPackage);
     DelayUs(10);

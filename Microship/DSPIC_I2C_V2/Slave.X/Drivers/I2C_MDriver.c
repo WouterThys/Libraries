@@ -327,42 +327,42 @@ void doFsm(i2cFsm_t * fsm) {
 #endif
 
 #ifdef I2C_SLAVE
-uint8_t tmp; // For dummy read
+uint8_t i2cRead;
+uint16_t dataCnt; 
 void doFsm(i2cFsm_t * fsm) {
     
     // Inputs
     bool mstrWrite = !i2cCheck(CHECK_RW);
     bool mstrAddr = !i2cCheck(CHECK_DA);
-    bool mstrAck = !i2cCheck(CHECK_ACKSTAT);
     
-    if (mstrWrite && mstrAddr) { // Address matched
-        tmp = i2cDataRead();        // Dummy read
-        i2cFlag.commFlag = true;    // Next byte will be command
+    if (mstrAddr) {                     // Master has addressed this device
+        dataCnt = 0;                    // Keep track of number of bytes
+        i2cRead = i2cDataRead();        // Dummy read address
         
-    } else if (mstrWrite && !mstrAddr) { // Data
-        
-        if (i2cFlag.commFlag) {
-            i2cFlag.commFlag = false;
-            i2cFlag.dataFlag = true;
-            
-            dataPtr = dataPtr + i2cDataRead(); // Set pointer
-            
-        } else if (i2cFlag.dataFlag) {
-            i2cFlag.commFlag = false;
-            i2cFlag.dataFlag = false;
-            
-            *dataPtr = (uint8_t) i2cDataRead(); // Store value into buffer
-            dataPtr = &dataBfr[0]; // Reset pointer
-            
+        if (!mstrWrite) {               // Master wants to read (repeat start)
+            i2cDataWrite(*dataPtr);     // Write the value of the buffer
+            i2cSclRel();                // Release SCL line
+            while (i2cCheck(CHECK_TBF));// Wait
+            dataPtr++;                  // Increment pointer for next read
         }
-    } else if (!mstrWrite && mstrAddr) {
-        tmp = i2cDataRead();
-        i2cDataWrite(*dataPtr); // Write the value of the buffer
-        i2cSclRel(); // Release SCL line
-        while (i2cCheck(CHECK_TBF)); // Wait
+    } else {                            // Master is now in data phase
+        dataCnt++;                      // 
         
-        dataPtr = &dataBfr[0]; // Reset pointer
+        if (!mstrWrite) {               // Multiple byte read
+            i2cDataWrite(*dataPtr);     // Write the value of the buffer
+            i2cSclRel();                // Release SCL line
+            while (i2cCheck(CHECK_TBF));// Wait
+            dataPtr++;                  // Increment pointer for next read
+        } else {
+            if (dataCnt == 1) {         // Command byte -> set the pointer
+                dataPtr = &dataBfr[0] + i2cDataRead();
+            } else {                    // Read data into the buffer
+                *dataPtr = (uint8_t) i2cDataRead();
+                dataPtr++;              // Increment for next write
+            }
+        }
     }
+    
     
 }
 #endif
@@ -519,3 +519,35 @@ void __attribute__((interrupt, no_auto_psv)) _SI2C1Interrupt(void) {
 #endif
     }
 }
+
+
+
+
+//    if (mstrWrite && mstrAddr) { // Address matched
+//        tmp = i2cDataRead();        // Dummy read
+//        i2cFlag.commFlag = true;    // Next byte will be command
+//        
+//    } else if (mstrWrite && !mstrAddr) { // Data
+//        
+//        if (i2cFlag.commFlag) {
+//            i2cFlag.commFlag = false;
+//            i2cFlag.dataFlag = true;
+//            
+//            dataPtr = dataPtr + i2cDataRead(); // Set pointer
+//            
+//        } else if (i2cFlag.dataFlag) {
+//            i2cFlag.commFlag = false;
+//            i2cFlag.dataFlag = false;
+//            
+//            *dataPtr = (uint8_t) i2cDataRead(); // Store value into buffer
+//            dataPtr = &dataBfr[0]; // Reset pointer
+//            
+//        }
+//    } else if (!mstrWrite && mstrAddr) {
+//        tmp = i2cDataRead();
+//        i2cDataWrite(*dataPtr); // Write the value of the buffer
+//        i2cSclRel(); // Release SCL line
+//        while (i2cCheck(CHECK_TBF)); // Wait
+//        
+//        dataPtr = &dataBfr[0]; // Reset pointer
+//    }
