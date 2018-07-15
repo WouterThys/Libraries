@@ -53,8 +53,9 @@
 /**
  * I²C
  */
-#define I2C_MASTER      1 /*I2C_MASTER*/
-#define I2C_ADDRESS     0x55
+#define I2C_MASTER      /* Or I2C_SLAVE                                       */
+#define I2C_WORD_WIDE   /* All data is send as 16-bit                         */
+#define I2C_ADDRESS     0x55   
 
 #define I2C_SCL_Dir     TRISBbits.TRISB6        /* SCL Direction              */
 #define I2C_SDA_Dir     TRISBbits.TRISB5        /* SDA Direction              */

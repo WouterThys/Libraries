@@ -453,36 +453,68 @@ void i2cDriverReset() {
 }
 
 #ifdef I2C_MASTER
-void i2cDriverWrite(i2cPackage_t *data) {
-//    if (!masterReady) {
-//        data->status = I2C_STILL_BUSY; // Still busy
-//        return;
-//    }
-//    uint8_t command = ((data->length << 4) & 0xF0) | (data->command & 0x0F);
-//    data->command = command;
+void i2cDriverWrite(i2cPackage_t *data) { 
+    
+#ifdef I2C_WORD_WIDE
+    
+    uint16_t * old = &data->data[0];
+    uint16_t tmp[data->length * 2];
+    uint16_t i;
+    for (i = 0; i < data->length; i++) {
+        tmp[2*i] = (uint8_t) data->data[i];
+        tmp[2*i+1] = (uint8_t) ((data->data[i]) >> 8);
+    }
+    data->length = data->length * 2;
+    data->data = tmp;
+    
+#endif
     
     i2cFsm.data = data;
     i2cFsm.cmd = I2C_MWRITE;
     while (i2cFsm.cmd > I2C_IDLE) {
         doFsm(&i2cFsm);
     }
+    
+#ifdef I2C_WORD_WIDE
+    data->length = data->length / 2;
+    data->data = old;
+#endif
+    
 }
 #endif
 
 #ifdef I2C_MASTER
-void i2cDriverRead(i2cPackage_t *data) {
-//    if (!masterReady) {
-//        data->status = I2C_STILL_BUSY; // Still busy
-//        return;
-//    }
-//    uint8_t command = ((data->length << 4) & 0xF0) | (data->command & 0x0F);
-//    data->command = command;
+void i2cDriverRead(i2cPackage_t * data) { 
+    
+#ifdef I2C_WORD_WIDE
+    data->length = data->length * 2;
+    
+#endif
     
     i2cFsm.data = data;
     i2cFsm.cmd = I2C_MREAD;
     while (i2cFsm.cmd > I2C_IDLE) {
         doFsm(&i2cFsm);
     }
+    
+#ifdef I2C_WORD_WIDE
+    
+//    data->length = data->length / 2;
+//    uint16_t i;
+//    for (i = 0; i < data->length; i++) {
+//        data->data[i] = 
+//                ((data->data[2*i]) & 0x00FF)  
+//                |
+//                (((data->data[2*i+1]) << 8) & 0xFF00);
+//    }
+    
+    uint16_t i;
+    for (i = 0; i < data->length; i++) {
+        printf(" - %d = %d\n", i, data->data[i]);
+    }
+    
+#endif
+    
 }
 #endif
 

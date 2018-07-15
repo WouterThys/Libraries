@@ -34,9 +34,9 @@
 typedef struct {
     uint8_t address;    /* Address (7-bit) of the slave                       */
     uint8_t command;    /* Command (8-bit) send from M -> S                   */
-    int8_t  status;     /* Status of R/W                                      */
-    uint8_t length;     /* Length of data buffer                              */
-    uint8_t * data;     /* The data                                           */
+    int16_t  status;    /* Status of R/W                                      */
+    uint16_t length;    /* Length of data buffer                              */
+    uint16_t * data;    /* The data                                           */
     
 } i2cPackage_t;
 
@@ -45,7 +45,7 @@ void i2cDriverInit();
 #endif
 
 #ifdef I2C_SLAVE
-void i2cDriverInit(); // TODO add call-back method and buffer
+void i2cDriverInit(i2cPackage_t * data, void (*onI2cEvent)(i2cPackage_t data)); 
 #endif
 
 /**

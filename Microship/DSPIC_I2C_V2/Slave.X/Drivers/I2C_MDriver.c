@@ -52,11 +52,6 @@ typedef struct {
     i2cPackage_t * data; // The data to read or write
 } i2cFsm_t ;
 
-typedef struct {
-    uint8_t commFlag:1;
-    uint8_t dataFlag:1;
-} i2cFlag_t ;
-
 /*******************************************************************************
  *          MACRO FUNCTIONS
  ******************************************************************************/
@@ -81,17 +76,18 @@ typedef struct {
 static volatile bool masterInterrupt;
 #endif
 
-#ifdef I2C_SLAVE
-static uint8_t   dataBfr[MAX_BUFFER];        // Data
-static uint8_t * dataPtr;                    // Pointer to data location
-#endif
-
 static i2cFsm_t i2cFsm;
 
 /*******************************************************************************
  *          LOCAL FUNCTIONS
  ******************************************************************************/
 static void doFsm(i2cFsm_t * );
+
+#ifdef I2C_SLAVE
+static void (*i2cEvent)(i2cPackage_t data);
+static void write(i2cPackage_t * package);
+static void read(i2cPackage_t * package);
+#endif
 
 #ifdef I2C_MASTER
 void doFsm(i2cFsm_t * fsm) {   
@@ -326,43 +322,113 @@ void doFsm(i2cFsm_t * fsm) {
 #endif
 
 #ifdef I2C_SLAVE
+bool wMSB = false;
+void write(i2cPackage_t * p) {
+#ifdef I2C_WORD_WIDE
+    uint8_t w = 0;
+    if (wMSB) {                         // Write MSB
+        w = (uint8_t) ((p->data[p->command]) >> 8);
+        
+        wMSB = false;
+        p->command++;                   // Increment pointer for next read
+    } else {                            // Write LSB
+        w = (uint8_t) p->data[p->command];
+        
+        wMSB = true;                    // Don't increment command pointer
+    }
+    
+    i2cDataWrite(w);                    // Write the value of the buffer
+    i2cSclRel();                        // Release SCL line
+    while (i2cCheck(CHECK_TBF));        // Wait
+#else
+    i2cDataWrite(p->data[p->command]);  // Write the value of the buffer
+    i2cSclRel();                        // Release SCL line
+    while (i2cCheck(CHECK_TBF));        // Wait
+    p->command++;                       // Increment pointer for next read
+#endif
+}
+
+bool rMSB = false;
+void read(i2cPackage_t * p) {
+#ifdef I2C_WORD_WIDE
+    uint8_t r = (uint8_t) i2cDataRead();
+    
+    if (rMSB) {
+        p->data[p->command] |= (((uint16_t)r << 8) & 0xFF00);
+        rMSB = false;
+        p->command++;
+    } else {
+        p->data[p->command] = r;
+        rMSB = true;
+    }
+#else
+    p->data[p->command] = (uint8_t) i2cDataRead();
+    p->command++;
+#endif
+}
+
 uint8_t i2cRead;
-uint16_t dataCnt; 
 void doFsm(i2cFsm_t * fsm) {
     
     // Inputs
     bool mstrWrite = !i2cCheck(CHECK_RW);
     bool mstrAddr = !i2cCheck(CHECK_DA);
+    i2cPackage_t * p = fsm->data;
     
-    if (mstrAddr) {                     // Master has addressed this device
-        dataCnt = 0;                    // Keep track of number of bytes
-        i2cRead = i2cDataRead();        // Dummy read address
-        
-        if (!mstrWrite) {               // Master wants to read (repeat start)
-            i2cDataWrite(*dataPtr);     // Write the value of the buffer
-            i2cSclRel();                // Release SCL line
-            while (i2cCheck(CHECK_TBF));// Wait
-            dataPtr++;                  // Increment pointer for next read
-        }
-    } else {                            // Master is now in data phase
-        dataCnt++;                      // 
-        
-        if (!mstrWrite) {               // Multiple byte read
-            i2cDataWrite(*dataPtr);     // Write the value of the buffer
-            i2cSclRel();                // Release SCL line
-            while (i2cCheck(CHECK_TBF));// Wait
-            dataPtr++;                  // Increment pointer for next read
+    // Logic
+    if (mstrAddr) {                         // Master has addressed this device
+        fsm->dataCnt = 0;                   // Keep track of number of bytes
+        i2cRead = i2cDataRead();            // Dummy read address     
+        if (!mstrWrite) {                   // Master wants to read (repeat start)
+            // Set status
+            p->status = I2C_MREAD;
+            
+            // Handle I2C
+            write(p);                       // Write the value of the buffer
+            
+            // Event
+            (*i2cEvent)(*p);
         } else {
-            if (dataCnt == 1) {         // Command byte -> set the pointer
-                dataPtr = &dataBfr[0] + i2cDataRead();
-            } else {                    // Read data into the buffer
-                *dataPtr = (uint8_t) i2cDataRead();
-                dataPtr++;              // Increment for next write
+            p->status = I2C_MWRITE;
+            
+        }
+    } else {                                // Master is now in data phase
+        fsm->dataCnt++;                       
+        if (!mstrWrite) {                   // Multiple byte read
+            // Set status
+            p->status = I2C_MREAD;
+            
+            // Handle I2C
+            write(p);                       // Write the value of the buffer
+            
+            // Event
+            (*i2cEvent)(*p);
+        } else {
+            if (fsm->dataCnt == 1) {        // Command byte
+                // Set status
+                p->status = I2C_MWRITE;
+                
+                // Handle I2C
+                p->command = i2cDataRead(); // Set the pointer
+                wMSB = false;
+                rMSB = false;
+            } else {                        // Read data into the buffer
+                // Set status
+                p->status = I2C_MWRITE;
+                
+                // Handle I2C
+                read(p);                    // Read the value from the buffer
+                
+                // Event
+                (*i2cEvent)(*p);
             }
         }
     }
     
-    
+    // Safety check
+    if (p->command >= p->length) {
+        p->command = 0;
+    }
 }
 #endif
 
@@ -398,22 +464,25 @@ void i2cDriverInit() {
 #endif
 
 #ifdef I2C_SLAVE
-void i2cDriverInit() {
+void i2cDriverInit(i2cPackage_t *data, void (*onI2cEvent)(i2cPackage_t data)) {
     i2cDriverEnable(false);
     
-    /* Variables */
+    /* Variables */ 
+    i2cEvent = onI2cEvent;
+    
+    data->address = I2C_ADDRESS;
+    data->command = 0; // Is used as address for the data buffer in slave mode
+    data->status = I2C_IDLE;
+    
     i2cFsm.state = I2C_STATE_IDLE;
     i2cFsm.cmd = I2C_IDLE;
     i2cFsm.dataCnt = 0;
     i2cFsm.retryCnt = 0;
-
-    dataPtr = &dataBfr[0];
+    i2cFsm.data = data;
     
     /* Ports */
     I2C_SCL_Odc = 0;    // Open drain
     I2C_SDA_Odc = 0;    // Open drain
-    //I2C_SCL_Dir = 1;
-    //I2C_SDA_Dir = 1;
     
     /* I2C1 Registers */
     I2C1CON = 0x0000;
@@ -510,7 +579,6 @@ void __attribute__((interrupt, no_auto_psv)) _SI2C1Interrupt(void) {
     if (_SI2C1IF) {
         _SI2C1IF = 0;
 #ifdef I2C_SLAVE
-      LED1 = !LED1;
       doFsm(&i2cFsm);
 #endif
     }
