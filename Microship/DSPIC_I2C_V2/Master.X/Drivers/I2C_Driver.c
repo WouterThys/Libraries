@@ -3,7 +3,7 @@
 #include <stdint.h>        /* Includes uint16_t definition                    */
 #include <stdbool.h>
 
-#include "I2C_MDriver.h"
+#include "I2C_Driver.h"
 
 /*******************************************************************************
  *          DEFINES
@@ -71,6 +71,7 @@ typedef struct {
 #define i2cAck()                I2C2CONbits.ACKDT = 0
 #define i2cNAck()               I2C2CONbits.ACKDT = 1
 #define i2cStop()               I2C2CONbits.PEN = 1
+#define i2cSclRel()             I2C1CONbits.SCLREL = 1
 #define i2cCheck(msk)           ((I2C2STAT & msk) > 0)
 
 /*******************************************************************************
@@ -326,38 +327,113 @@ void doFsm(i2cFsm_t * fsm) {
 #endif
 
 #ifdef I2C_SLAVE
-uint8_t tmp; // For dummy read
-void doFsm(i2cFsm_t * fsm) {
-    
-    if (!i2cCheck(CHECK_RW) && !i2cCheck(CHECK_DA)) { // Address matched
-        tmp = i2cDataRead();        // Dummy read
-        i2cFlag.commFlag = true;    // Next byte will be command
+bool wMSB = false;
+void write(i2cPackage_t * p) {
+#ifdef I2C_WORD_WIDE
+    uint8_t w = 0;
+    if (wMSB) {                         // Write MSB
+        w = (uint8_t) ((p->data[p->command]) >> 8);
         
-    } else if (!i2cCheck(CHECK_RW) && i2cCheck(CHECK_DA)) { // Data
+        wMSB = false;
+        p->command++;                   // Increment pointer for next read
+    } else {                            // Write LSB
+        w = (uint8_t) p->data[p->command];
         
-        if (i2cFlag.commFlag) {
-            i2cFlag.commFlag = false;
-            i2cFlag.dataFlag = true;
-            
-            dataPtr = dataPtr + i2cDataRead(); // Set pointer
-            
-        } else if (i2cFlag.dataFlag) {
-            i2cFlag.commFlag = false;
-            i2cFlag.dataFlag = false;
-            
-            *dataPtr = (uint8_t) i2cDataRead(); // Store value into buffer
-            dataPtr = &dataBfr[0]; // Reset pointer
-            
-        }
-    } else if (i2cCheck(CHECK_RW) && !i2cCheck(CHECK_DA)) {
-        tmp = i2cDataRead();
-        i2cDataWrite(*dataPtr); // Write the value of the buffer
-        I2C2CONbits.SCLREL = 1; // Release SCL line
-        while (I2C2STATbits.TBF); // Wait
-        
-        dataPtr = &dataBfr[0]; // Reset pointer
+        wMSB = true;                    // Don't increment command pointer
     }
     
+    i2cDataWrite(w);                    // Write the value of the buffer
+    i2cSclRel();                        // Release SCL line
+    while (i2cCheck(CHECK_TBF));        // Wait
+#else
+    i2cDataWrite(p->data[p->command]);  // Write the value of the buffer
+    i2cSclRel();                        // Release SCL line
+    while (i2cCheck(CHECK_TBF));        // Wait
+    p->command++;                       // Increment pointer for next read
+#endif
+}
+
+bool rMSB = false;
+void read(i2cPackage_t * p) {
+#ifdef I2C_WORD_WIDE
+    uint8_t r = (uint8_t) i2cDataRead();
+    
+    if (rMSB) {
+        p->data[p->command] |= (((uint16_t)r << 8) & 0xFF00);
+        rMSB = false;
+        p->command++;
+    } else {
+        p->data[p->command] = r;
+        rMSB = true;
+    }
+#else
+    p->data[p->command] = (uint8_t) i2cDataRead();
+    p->command++;
+#endif
+}
+
+uint8_t i2cRead;
+void doFsm(i2cFsm_t * fsm) {
+    
+    // Inputs
+    bool mstrWrite = !i2cCheck(CHECK_RW);
+    bool mstrAddr = !i2cCheck(CHECK_DA);
+    i2cPackage_t * p = fsm->data;
+    
+    // Logic
+    if (mstrAddr) {                         // Master has addressed this device
+        fsm->dataCnt = 0;                   // Keep track of number of bytes
+        i2cRead = i2cDataRead();            // Dummy read address     
+        if (!mstrWrite) {                   // Master wants to read (repeat start)
+            // Set status
+            p->status = I2C_MREAD;
+            
+            // Handle I2C
+            write(p);                       // Write the value of the buffer
+            
+            // Event
+            (*i2cEvent)(*p);
+        } else {
+            p->status = I2C_MWRITE;
+            
+        }
+    } else {                                // Master is now in data phase
+        fsm->dataCnt++;                       
+        if (!mstrWrite) {                   // Multiple byte read
+            // Set status
+            p->status = I2C_MREAD;
+            
+            // Handle I2C
+            write(p);                       // Write the value of the buffer
+            
+            // Event
+            (*i2cEvent)(*p);
+        } else {
+            if (fsm->dataCnt == 1) {        // Command byte
+                // Set status
+                p->status = I2C_MWRITE;
+                
+                // Handle I2C
+                p->command = i2cDataRead(); // Set the pointer
+                wMSB = false;
+                rMSB = false;
+            } else {                        // Read data into the buffer
+                // Set status
+                p->status = I2C_MWRITE;
+                
+                // Handle I2C
+                read(p);                    // Read the value from the buffer
+                
+                // Event
+                (*i2cEvent)(*p);
+            }
+        }
+    }
+    
+    // Safety check
+    if (p->command >= p->length) {
+        p->command = 0;
+    }
 }
 #endif
 
@@ -395,33 +471,36 @@ void i2cDriverInit() {
 #endif
 
 #ifdef I2C_SLAVE
-void i2cDriverInit() {
+void i2cDriverInit(i2cPackage_t *data, void (*onI2cEvent)(i2cPackage_t data)) {
     i2cDriverEnable(false);
     
-    /* Variables */
+    /* Variables */ 
+    i2cEvent = onI2cEvent;
+    
+    data->address = I2C_ADDRESS;
+    data->command = 0; // Is used as address for the data buffer in slave mode
+    data->status = I2C_IDLE;
+    
     i2cFsm.state = I2C_STATE_IDLE;
     i2cFsm.cmd = I2C_IDLE;
     i2cFsm.dataCnt = 0;
     i2cFsm.retryCnt = 0;
-    
-    i2cFlag.commFlag = false;
-    i2cFlag.dataFlag = false;
-
-    dataPtr = &dataBfr[0];
+    i2cFsm.data = data;
     
     /* Ports */
     I2C_SCL_Odc = 0;    // Open drain
     I2C_SDA_Odc = 0;    // Open drain
     
-    /* I2C2 Registers */
-    I2C2CON = 0x0000;
-    I2C2ADD = I2C_ADDRESS;
-    IFS1 = 0;
+    /* I2C1 Registers */
+    I2C1CON = 0x0000;
+    I2C1STAT = 0x0000;
+    I2C1MSK = 0x0000;
+    I2C1ADD = I2C_ADDRESS;
 
     /* Interrupts slave */
-    _SI2C2IF = 0; // Clear flag
-    _SI2C2IP = IP_I2C; // Priority is highest
-    _SI2C2IE = 1; // Enable
+    _SI2C1IF = 0; // Clear flag
+    _SI2C1IP = IP_I2C; // Priority is highest
+    _SI2C1IE = 1; // Enable
 }
 #endif
 

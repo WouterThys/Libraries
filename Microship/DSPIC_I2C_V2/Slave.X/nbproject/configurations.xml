@@ -7,7 +7,7 @@
       <logicalFolder name="Drivers" displayName="Drivers" projectFiles="true">
         <itemPath>Drivers/SYSTEM_Driver.h</itemPath>
         <itemPath>Drivers/UART_Driver.h</itemPath>
-        <itemPath>Drivers/I2C_MDriver.h</itemPath>
+        <itemPath>Drivers/I2C_Driver.h</itemPath>
       </logicalFolder>
       <itemPath>Settings.h</itemPath>
       <itemPath>utils.h</itemPath>
@@ -22,7 +22,7 @@
       <logicalFolder name="Drivers" displayName="Drivers" projectFiles="true">
         <itemPath>Drivers/SYSTEM_Driver.c</itemPath>
         <itemPath>Drivers/UART_Driver.c</itemPath>
-        <itemPath>Drivers/I2C_MDriver.c</itemPath>
+        <itemPath>Drivers/I2C_Driver.c</itemPath>
       </logicalFolder>
       <itemPath>configuration.c</itemPath>
       <itemPath>main.c</itemPath>
@@ -48,7 +48,7 @@
         <platformTool>PICkit3PlatformTool</platformTool>
         <languageToolchain>XC16</languageToolchain>
         <languageToolchainVersion>1.33</languageToolchainVersion>
-        <platform>2</platform>
+        <platform>3</platform>
       </toolsSet>
       <compileType>
         <linkerTool>
