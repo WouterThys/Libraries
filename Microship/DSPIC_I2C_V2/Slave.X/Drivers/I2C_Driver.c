@@ -3,7 +3,7 @@
 #include <stdint.h>        /* Includes uint16_t definition                    */
 #include <stdbool.h>
 
-#include "I2C_MDriver.h"
+#include "I2C_Driver.h"
 
 /*******************************************************************************
  *          DEFINES
@@ -76,18 +76,18 @@ typedef struct {
 static volatile bool masterInterrupt;
 #endif
 
+#ifdef I2C_SLAVE
+static void (*i2cEvent)(i2cPackage_t data);
+static void write(i2cPackage_t * package);
+static void read(i2cPackage_t * package);
+#endif
+
 static i2cFsm_t i2cFsm;
 
 /*******************************************************************************
  *          LOCAL FUNCTIONS
  ******************************************************************************/
 static void doFsm(i2cFsm_t * );
-
-#ifdef I2C_SLAVE
-static void (*i2cEvent)(i2cPackage_t data);
-static void write(i2cPackage_t * package);
-static void read(i2cPackage_t * package);
-#endif
 
 #ifdef I2C_MASTER
 void doFsm(i2cFsm_t * fsm) {   
@@ -164,7 +164,7 @@ void doFsm(i2cFsm_t * fsm) {
                 
                 if (!i2cCheck(CHECK_ACKSTAT)) { // ACK
                     if (fsm->dataCnt >= fsm->data->length) { 
-                        fsm->state = I2C_STATE_ACK_POLL; // Done
+                        fsm->state = I2C_STATE_STOP; // Done
                     } else {
                         fsm->state = I2C_STATE_SEND; // Keep writing
                     }
@@ -300,20 +300,20 @@ void doFsm(i2cFsm_t * fsm) {
             bool ackTest;
         case I2C_STATE_ACK_POLL:
             i2cStop();
-            while(!_MI2C1IF);
-            while(_MI2C1IF);
+            while(!_MI2C2IF);
+            while(_MI2C2IF);
             ackTest = true;
             while (ackTest) {
                 i2cRepeatStart();
-                while(!_MI2C1IF);
-                while(_MI2C1IF);
+                while(!_MI2C2IF);
+                while(_MI2C2IF);
                 i2cAddressWrite(fsm->data->address);
                 while (_TRSTAT);
                 ackTest = !i2cCheck(CHECK_ACKSTAT);
             }
             i2cStop();
-            while(!_MI2C1IF);
-            while(_MI2C1IF);
+            while(!_MI2C2IF);
+            while(_MI2C2IF);
             masterInterrupt = false;
             fsm->state = I2C_STATE_STOP;
             break;
@@ -449,17 +449,19 @@ void i2cDriverInit() {
     /* Ports */
     I2C_SCL_Odc = 0;    // Open drain
     I2C_SDA_Odc = 0;    // Open drain
+    I2C_SCL_Dir = 0;
+    I2C_SDA_Dir = 0;
     
-    /* I2C1 Registers */
-    I2C1CON = 0x0000;
-    I2C1CONbits.SCLREL = 1; // Releases the SCLx clock
-    I2C1STAT = 0x0000;
-    I2C1BRG = 180;//180; // 100kHz clock
+    /* I2C2 Registers */
+    I2C2CON = 0x0000;
+    I2C2CONbits.SCLREL = 1; // Releases the SCLx clock
+    I2C2STAT = 0x0000;
+    I2C2BRG = 320;//180; // 100kHz clock
     
     /* Interrupts master */
-    _MI2C1IF = 0; // Clear flag
-    _MI2C1IP = IP_I2C; // Priority is highest
-    _MI2C1IE = 1; // Enable
+    _MI2C2IF = 0; // Clear flag
+    _MI2C2IP = IP_I2C; // Priority is highest
+    _MI2C2IE = 1; // Enable
 }
 #endif
 
@@ -525,36 +527,68 @@ void i2cDriverReset() {
 }
 
 #ifdef I2C_MASTER
-void i2cDriverWrite(i2cPackage_t *data) {
-//    if (!masterReady) {
-//        data->status = I2C_STILL_BUSY; // Still busy
-//        return;
-//    }
-    uint8_t command = ((data->length << 4) & 0xF0) | (data->command & 0x0F);
-    data->command = command;
+void i2cDriverWrite(i2cPackage_t *data) { 
+    
+#ifdef I2C_WORD_WIDE
+    
+    uint16_t * old = &data->data[0];
+    uint16_t tmp[data->length * 2];
+    uint16_t i;
+    for (i = 0; i < data->length; i++) {
+        tmp[2*i] = (uint8_t) data->data[i];
+        tmp[2*i+1] = (uint8_t) ((data->data[i]) >> 8);
+    }
+    data->length = data->length * 2;
+    data->data = tmp;
+    
+#endif
     
     i2cFsm.data = data;
     i2cFsm.cmd = I2C_MWRITE;
     while (i2cFsm.cmd > I2C_IDLE) {
         doFsm(&i2cFsm);
     }
+    
+#ifdef I2C_WORD_WIDE
+    data->length = data->length / 2;
+    data->data = old;
+#endif
+    
 }
 #endif
 
 #ifdef I2C_MASTER
-void i2cDriverRead(i2cPackage_t *data) {
-//    if (!masterReady) {
-//        data->status = I2C_STILL_BUSY; // Still busy
-//        return;
-//    }
-    uint8_t command = ((data->length << 4) & 0xF0) | (data->command & 0x0F);
-    data->command = command;
+void i2cDriverRead(i2cPackage_t * data) { 
+    
+#ifdef I2C_WORD_WIDE
+    data->length = data->length * 2;
+    
+#endif
     
     i2cFsm.data = data;
     i2cFsm.cmd = I2C_MREAD;
     while (i2cFsm.cmd > I2C_IDLE) {
         doFsm(&i2cFsm);
     }
+    
+#ifdef I2C_WORD_WIDE
+    
+//    data->length = data->length / 2;
+//    uint16_t i;
+//    for (i = 0; i < data->length; i++) {
+//        data->data[i] = 
+//                ((data->data[2*i]) & 0x00FF)  
+//                |
+//                (((data->data[2*i+1]) << 8) & 0xFF00);
+//    }
+    
+    uint16_t i;
+    for (i = 0; i < data->length; i++) {
+        printf(" - %d = %d\n", i, data->data[i]);
+    }
+    
+#endif
+    
 }
 #endif
 
