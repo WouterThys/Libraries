@@ -132,11 +132,11 @@ int main(void) {
     
     DelayMs(100);
     
-//    uint16_t i;
-//    printf("Read buffer after writing:\n");
-//    for (i = 0; i < 3; i++) {
-//        printf(" %d: %d\n", i, readData[i]);
-//    }
+    uint16_t i;
+    printf("Read buffer after writing:\n");
+    for (i = 0; i < 3; i++) {
+        printf(" %d: %d\n", i, readData[i]);
+    }
     
     while (1) {
         LED1 = !LED1;

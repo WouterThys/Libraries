@@ -425,10 +425,10 @@ void doFsm(i2cFsm_t * fsm) {
         }
     }
     
-    // Safety check
-    if (p->command >= p->length) {
-        p->command = 0;
-    }
+//    // Safety check
+//    if (p->command >= p->length) {
+//        p->command = 0;
+//    }
 }
 #endif
 

@@ -40,6 +40,9 @@ static uint16_t i2cBuffer[3] = {0x0000, 0x0000, 0x0000};
 static int8_t i2cError;
 static bool i2cHasData;
 
+static uint16_t debugBufferCnt = 0;
+static i2cPackage_t debugBuffer[20];
+
 /*******************************************************************************
  *          LOCAL FUNCTIONS
  ******************************************************************************/
@@ -48,6 +51,8 @@ static void onUartReadDone(UartData_t data);
 
 static void onI2CEvent(i2cPackage_t package);
 static bool checkI2CStatus(i2cPackage_t package);
+
+static void check();
 
 void initialize() {
     sysInterruptEnable(false);
@@ -69,6 +74,10 @@ void onUartReadDone(UartData_t data) {
 // NOTE !!!! => only add flag to main here, no code because this could mess with
 // the I2C read logic!
 void onI2CEvent(i2cPackage_t package) {
+    
+    debugBuffer[debugBufferCnt] = package;
+    debugBufferCnt++;
+    
     i2cHasData = true;
 }
 
@@ -120,18 +129,26 @@ int main(void) {
     while (1) {
         
         if (i2cHasData) {
-            i2cHasData = false;
+            check();
             
-            printf("Slave RW:\n");
-            
-            uint8_t i;
-            for (i = 0; i < i2cPackage.length; i++) {
-                printf(" %d: %d\n", i, i2cPackage.data[i]);
+            printf("Got %d debug packs:\n", debugBufferCnt);
+            uint16_t i;
+            for (i = 0; i < debugBufferCnt; i++) {
+                i2cPackage_t ip = debugBuffer[i];
+                
+                printf(" %d: C=%d, L=%d, S=%d\n", i, ip.command, ip.length, ip.status);
             }
         }
        
     }
     return 0;
+}
+
+static void check() {
+    while (i2cHasData) {
+        i2cHasData = false;
+        DelayMs(1);
+    }
 }
 
 
