@@ -5,9 +5,9 @@
                    displayName="Header Files"
                    projectFiles="true">
       <logicalFolder name="Drivers" displayName="Drivers" projectFiles="true">
+        <itemPath>Drivers/ADC_Driver.h</itemPath>
         <itemPath>Drivers/SYSTEM_Driver.h</itemPath>
         <itemPath>Drivers/UART_Driver.h</itemPath>
-        <itemPath>../Common/I2C_Driver.h</itemPath>
       </logicalFolder>
       <itemPath>Settings.h</itemPath>
       <itemPath>utils.h</itemPath>
@@ -20,9 +20,9 @@
                    displayName="Source Files"
                    projectFiles="true">
       <logicalFolder name="Drivers" displayName="Drivers" projectFiles="true">
+        <itemPath>Drivers/ADC_Driver.c</itemPath>
         <itemPath>Drivers/SYSTEM_Driver.c</itemPath>
         <itemPath>Drivers/UART_Driver.c</itemPath>
-        <itemPath>../Common/I2C_Driver.c</itemPath>
       </logicalFolder>
       <itemPath>configuration.c</itemPath>
       <itemPath>main.c</itemPath>
@@ -35,8 +35,7 @@
     </logicalFolder>
   </logicalFolder>
   <sourceRootList>
-    <Elem>.</Elem>
-    <Elem>../Common</Elem>
+    <Elem>Drivers</Elem>
   </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
@@ -49,7 +48,7 @@
         <platformTool>PICkit3PlatformTool</platformTool>
         <languageToolchain>XC16</languageToolchain>
         <languageToolchainVersion>1.33</languageToolchainVersion>
-        <platform>3</platform>
+        <platform>2</platform>
       </toolsSet>
       <compileType>
         <linkerTool>
@@ -115,9 +114,6 @@
         <property key="use-cci" value="false"/>
         <property key="use-iar" value="false"/>
       </C30>
-      <C30-AR>
-        <property key="additional-options-chop-files" value="false"/>
-      </C30-AR>
       <C30-LD>
         <property key="additional-options-use-response-files" value="false"/>
         <property key="boot-eeprom" value="no_eeprom"/>
@@ -178,9 +174,6 @@
         <property key="relaxed-math" value="false"/>
         <property key="save-temps" value="false"/>
       </C30Global>
-      <PICkit3PlatformTool>
-        <property key="firmware.download.all" value="false"/>
-      </PICkit3PlatformTool>
     </conf>
   </confs>
 </configurationDescriptor>

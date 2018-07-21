@@ -10,7 +10,7 @@
 #include "Settings.h"
 #include "Drivers/SYSTEM_Driver.h"
 #include "Drivers/UART_Driver.h"
-#include "Drivers/I2C_Driver.h"
+#include "../Common/I2C_Driver.h"
 
 
 /*******************************************************************************

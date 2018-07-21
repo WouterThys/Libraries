@@ -26,3 +26,4 @@ funclist
 nbproject/Makefile-*
 disassembly/
 *.map
+/Microship/DSPIC_ADC_MULTICHANNEL/AdcMultiChannel.X/nbproject/private/

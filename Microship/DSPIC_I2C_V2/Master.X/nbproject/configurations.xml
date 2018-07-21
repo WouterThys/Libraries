@@ -7,7 +7,7 @@
       <logicalFolder name="Drivers" displayName="Drivers" projectFiles="true">
         <itemPath>Drivers/SYSTEM_Driver.h</itemPath>
         <itemPath>Drivers/UART_Driver.h</itemPath>
-        <itemPath>Drivers/I2C_Driver.h</itemPath>
+        <itemPath>../Common/I2C_Driver.h</itemPath>
       </logicalFolder>
       <itemPath>Settings.h</itemPath>
       <itemPath>utils.h</itemPath>
@@ -22,7 +22,7 @@
       <logicalFolder name="Drivers" displayName="Drivers" projectFiles="true">
         <itemPath>Drivers/SYSTEM_Driver.c</itemPath>
         <itemPath>Drivers/UART_Driver.c</itemPath>
-        <itemPath>Drivers/I2C_Driver.c</itemPath>
+        <itemPath>../Common/I2C_Driver.c</itemPath>
       </logicalFolder>
       <itemPath>configuration.c</itemPath>
       <itemPath>main.c</itemPath>
@@ -36,6 +36,7 @@
   </logicalFolder>
   <sourceRootList>
     <Elem>.</Elem>
+    <Elem>../Common</Elem>
   </sourceRootList>
   <projectmakefile>Makefile</projectmakefile>
   <confs>
