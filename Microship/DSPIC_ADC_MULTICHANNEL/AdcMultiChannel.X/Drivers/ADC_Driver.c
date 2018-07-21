@@ -5,6 +5,7 @@
 #include <math.h>
 
 #include "../Settings.h"
+#include "../utils.h"
 #include "SYSTEM_Driver.h"
 #include "ADC_Driver.h"
 
@@ -20,8 +21,8 @@
 /*******************************************************************************
  *          VARIABLES
  ******************************************************************************/
-unsigned int BufferA[32] __attribute__( (space(ymemory)) );
-unsigned int BufferB[32] __attribute__( (space(ymemory)) );
+unsigned int BufferA[ADC_CHANNELS * ADC_BUFFER_SIZE] __attribute__( (space(ymemory)) );
+unsigned int BufferB[ADC_CHANNELS * ADC_BUFFER_SIZE] __attribute__( (space(ymemory)) );
 
 uint16_t dmaBuffer = 0;
 
@@ -53,7 +54,7 @@ void initAdc1() {
     // AD1CON2 register -> addressing
     AD1CON2bits.BUFM = 0;       // Always starts filling the buffer from the start address.
     AD1CON2bits.ALTS = 0;       // Always uses channel input selects for Sample MUXA
-    AD1CON2bits.SMPI = 3;       // Increment rate is 3, 4 inputs are converted
+    AD1CON2bits.SMPI = ADC_CHANNELS-1;       // Increment rate is 3, 4 inputs are converted
     AD1CON2bits.CHPS = 0;       // Converts CH0
     AD1CON2bits.CSCNA = 1;      // Scans inputs for CH0+ during Sample MUXA
     
@@ -63,7 +64,7 @@ void initAdc1() {
             
     // AD1CON4 register -> DMA
     AD1CON4bits.ADDMAEN = 1;    // Conversion results are stored in the ADC1BUF0 register for transfer to RAM using DMA
-    AD1CON4bits.DMABL = 4;      // Allocates 16 words of buffer to each analog input
+    AD1CON4bits.DMABL = Log2(ADC_BUFFER_SIZE);      // Allocates 8 words of buffer to each analog input
     
     // Input select
     AD1CHS0bits.CH0NA = 0;      // MUXA -ve input selection (Vref-) for CH0
@@ -93,7 +94,7 @@ void initTimer3() {
 
 void initDma0() {
     // DMA0CON registers
-    DMA0CONbits.AMODE = 0;  // Register indirect with Post-Increment 
+    DMA0CONbits.AMODE = 2;  // Peripheral indirect with Post-Increment 
     DMA0CONbits.MODE = 2;   // Configure DMA for Continuous Ping-Pong mode
     
     // Tie it to ADC1
@@ -163,10 +164,15 @@ void adcDriverEnable(bool enable) {
 //  DMA done
 void __attribute__ ( (interrupt, no_auto_psv) ) _DMA0Interrupt(void) {
     // Switch between primary and secondary Ping-Pong buffers
+    uint16_t c;
     if (dmaBuffer == 0) {
-        (*readDone)(0, &BufferA[0]);
+        for (c = 0; c < ADC_CHANNELS; c++) {
+            (*readDone)(c, &BufferA[(c * ADC_BUFFER_SIZE)]);
+        }
     } else {
-        (*readDone)(0, &BufferB[0]);
+        for (c = 0; c < ADC_CHANNELS; c++) {
+            (*readDone)(c, &BufferB[(c * ADC_BUFFER_SIZE)]);
+        }
     }
     
     dmaBuffer ^= 1; // Toggle

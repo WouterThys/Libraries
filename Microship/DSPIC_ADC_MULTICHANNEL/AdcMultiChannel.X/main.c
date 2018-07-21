@@ -30,7 +30,7 @@
 /*******************************************************************************
  *          VARIABLES
  ******************************************************************************/
-static uint16_t adcData[32];
+static uint16_t adcData[4];
 static volatile bool adcDone = false;
 static volatile bool printed = false;
 
@@ -86,7 +86,7 @@ int main(void) {
            printf("ADC done\n");
            
            uint16_t i;
-           for (i = 0; i < 32; i++) {
+           for (i = 0; i < 4; i++) {
                printf(" %d:%d\n", i, adcData[i]);
            }
        }     
@@ -95,13 +95,10 @@ int main(void) {
 }
 
 void onAdcDone(uint16_t buffer, uint16_t* data) {
-    LED1 = !LED1;
-
-    uint16_t i;
-    for (i = 0; i < 32; i++) {
-        adcData[i] = *(data + i);
-    }
+    
+    adcData[buffer] = (uint16_t) average(data, 8);
     adcDone = true;
+    
     
 }
 

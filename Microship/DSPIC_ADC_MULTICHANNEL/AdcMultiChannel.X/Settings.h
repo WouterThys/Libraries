@@ -32,8 +32,8 @@
 /**
  *  ADC
  */
-#define ADC_VREF        2.048
-#define ADC_n           10
+#define ADC_VREF        3.3
+#define ADC_n           12
     
 #define ADC_BUFFER_SIZE 8
 #define ADC_CHANNELS    4       
